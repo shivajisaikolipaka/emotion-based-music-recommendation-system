@@ -1,0 +1,86 @@
+
+import tkinter as tk
+from tkinter import filedialog
+import cv2
+from PIL import Image, ImageTk
+import playsound
+from keras.models import load_model
+import numpy as np
+import winsound
+import pygame
+
+# Initialize the main window
+main = tk.Tk()
+main.title("EMOTION BASED MUSIC RECOMMENDATION SYSTEM")
+main.geometry("1200x1200")
+
+# Load the face detection and emotion recognition models
+detection_model_path = 'haarcascade_frontalface_default.xml'
+emotion_model_path = '_mini_XCEPTION.106-0.65.hdf5'
+face_detection = cv2.CascadeClassifier(detection_model_path)
+emotion_classifier = load_model(emotion_model_path, compile=False)
+EMOTIONS = ["angry", "disgust", "scared", "happy", "sad", "surprised", "neutral"]
+
+# Function to process uploaded image
+def process_image(filename):
+    global faces
+    print("Processing image:", filename)
+    image = cv2.imread(filename)
+    if image is None:
+        print("Error: Unable to load image")
+        return
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    faces = face_detection.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30), flags=cv2.CASCADE_SCALE_IMAGE)
+    if len(faces) == 0:
+        print("No faces detected")
+        return
+    print("Number of faces detected:", len(faces))
+    for (x, y, w, h) in faces:
+        # Extract face region
+        roi_gray = gray[y:y + h, x:x + w]
+        # Resize to required size
+        roi_gray = cv2.resize(roi_gray, (48, 48), interpolation=cv2.INTER_AREA)
+        # Convert to float and normalize
+        roi = roi_gray.astype("float") / 255.0
+        # Expand dimensions
+        roi = np.expand_dims(roi, axis=0)
+        # Predict emotion
+        preds = emotion_classifier.predict(roi)[0]
+        emotion_label = EMOTIONS[preds.argmax()]
+        print("Detected Emotion:", emotion_label)
+        # Call music recommendation function
+        recommend_music(emotion_label)
+
+
+
+
+# Function to recommend music based on detected emotion
+def recommend_music(emotion):
+    pygame.mixer.init()
+    if emotion == "happy":
+        pygame.mixer.music.load("Happy.mp3")
+        pygame.mixer.music.play()
+    elif emotion == "sad":
+        pygame.mixer.music.load("Sad.mp3")
+        pygame.mixer.music.play()
+    else:
+        pygame.mixer.music.load("default_music.mp3")
+        pygame.mixer.music.play()
+
+
+
+# Function to upload image
+def upload():
+    filename = filedialog.askopenfilename(initialdir="images")
+    if filename:
+        pathlabel.config(text="Selected file: " + filename)
+        process_image(filename)
+
+# Create widgets
+upload_button = tk.Button(main, text="Upload Image", command=upload)
+pathlabel = tk.Label(main)
+upload_button.pack()
+pathlabel.pack()
+
+# Start the main loop
+main.mainloop()
